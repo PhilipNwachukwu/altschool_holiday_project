@@ -113,65 +113,81 @@
     - not 'Local modifications exist in repository' in repo_clone.msg
   
   - name: Template a web.php to /routes/web.php
-    command: echo mytemplates/web.php > /var/www/laravelapp/routes/web.php
+    ansible.builtin.template:
+      src: /mytemplates/web.php.j2
+      dest: /var/www/laravelapp/routes/web.php
+      mode: "0644"
  
-  - name: copy web.php to routes/web.php
-    copy:
-        src: mytemplates/web.php
-        dest: /var/www/laravelapp/routes/web.php
-
   - name: Change ownership and set permissions of laravel folder
     file:
       path: /var/www/laravelapp
+      state: directory
       recurse: yes
       owner: www-data
       group: www-data
       mode: "775"
+    
+  - name: set permissions for Laravel folder
+    file:
+      path: /var/www/laravelapp
+      state: directory
+      recurse: yes
+      mode: '0775'
 
-  - name: Change group and set permissions of storage folder
+  - name: Change group for Storage
     file:
       path: /var/www/laravelapp/storage
-      recurse: yes
+      state: directory
+      recurse: yes                         
       group: www-data
-      mode: "ug+rwx"
-
-  - name: Change group and set permissions of cache
+ 
+  - name: set permissions for storage
     file:
-      path: /var/www/laravelapp/bootstrap/cache
+      path: /var/www/laravelapp/storage
+      state: directory
       recurse: yes
-      group: www-data
-      mode: "ug+rwx"
+      mode: 'ug+rwx"
+
+  - name: set permissions for storage and cache
+    file:
+      path: /var/www/laravelapp/
+      state: directory
+      recurse: yes
+      mode: '0775'
 
   - name: Download and installs all libs and dependencies
     composer:
-      command: update
+      command: install
       working_dir: /var/www/laravelapp
     environment:
       COMPOSER_ALLOW_SUPERUSER: "1"
-  
-  - name: copy .env
-    copy:
-        src: mytemplates/.env
-        dest: /var/www/laravel  
 
-  - name: copy .htaccess
+  - name: copy env file
     copy:
-        src: stubs/.htaccess
-        dest: /var/www/laravel
+      src: /var/www/laravelapp/.env.example
+      remote_src: yes
+      dest: /var/www/laravelapp/.env
+      owner: "{{ ansible_effective_user_id }}"
+      group: "{{ ansible_effective_group_id }}"
+      mode: '0644'
+    become: yes
 
   - name: copy apache config
     copy:
         src: stubs/laravelapp.conf
         dest: /etc/apache2/sites-available/laravelapp.conf
-        owner: www-data
-        group: www-data
-        mode: '775'
+        owner: "{{ ansible_effective_user_id }}"
+        group: "{{ ansible_effective_group_id }}"
+        mode: '0644'
     become: yes
 
-  - name: Create Project  
-    ansible.builtin.command: composer create project
-    environment:
-      COMPOSER_ALLOW_SUPERUSER: "1"
+  - name: set server name
+    replace:
+        path: /etc/apache2/sites-available/laravelapp.conf
+        regexp: '$SERVER_NAME'
+        replace: '{{ ansible_host }}'
+    become: yes
+
   - name: enable the new config
     shell: |
       a2ensite laravelapp.conf
@@ -179,9 +195,10 @@
       a2enmod rewrite
       service apache2 restart
     become: yes
-  
+
   - name: setup laravel
     shell: |
         cd /var/www/laravelapp
-        php artisan migrate --seed
-    become: yes      
+        php artisan key:generate
+    become: yes
+      
