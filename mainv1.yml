@@ -5,17 +5,15 @@
 
   tasks:
  
-  - name: Add php sury repository from PPA and install its signing key on Debian>
-    script: scripts/php_8.1_repo.sh
-
-  - name: Add postresql repo
-    script: scripts/postgresql_repo.sh
-
-  - name: Run apt update and upgrade
+  - name: Run apt upgrade
     apt:
+      upgrade: "yes"
       update_cache: yes
-      upgrade: safe
-   
+      cache_valid_time: 432000
+
+  - name: Add php sury repository from PPA and install its signing key on Debian target
+    script: scripts/php_8.1_repo.sh
+  
   - name: Install php rerequisites
     ansible.builtin.apt:
       pkg:
@@ -29,8 +27,8 @@
   - name: Install php8.1
     apt:
       name: php8.1
-      state: latest
       update_cache: yes
+      state: latest
     tags:
     - php8.1
   
@@ -39,7 +37,6 @@
     apt:
       name: apache2
       state: latest
-      update_cache: yes
   
   - name: Install PostgreSQL DB Server
     script: scripts/postgresql.sh
@@ -123,13 +120,6 @@
         src: mytemplates/web.php
         dest: /var/www/laravelapp/routes/web.php
 
-  - name: Download and installs all libs and dependencies
-    composer:
-      command: update
-      working_dir: /var/www/laravelapp
-    environment:
-      COMPOSER_ALLOW_SUPERUSER: "1"  
-
   - name: Change ownership and set permissions of laravel folder
     file:
       path: /var/www/laravelapp
@@ -151,24 +141,23 @@
       recurse: yes
       group: www-data
       mode: "ug+rwx"
+
+  - name: Download and installs all libs and dependencies
+    composer:
+      command: update
+      working_dir: /var/www/laravelapp
+    environment:
+      COMPOSER_ALLOW_SUPERUSER: "1"
   
   - name: copy .env
     copy:
         src: mytemplates/.env
-        dest: /var/www/laravelapp/.env
-        owner: www-data
-        group: www-data
-        mode: "775"
-    become: yes   
+        dest: /var/www/laravelapp/.env  
 
   - name: copy .htaccess
     copy:
         src: stubs/.htaccess
         dest: /var/www/laravelapp/.htaccess
-        owner: www-data
-        group: www-data
-        mode: "775"
-    become: yes
 
   - name: copy apache config
     copy:
@@ -178,6 +167,11 @@
         group: www-data
         mode: '775'
     become: yes
+
+  - name: Create Project  
+    ansible.builtin.command: composer create project
+    environment:
+      COMPOSER_ALLOW_SUPERUSER: "1"
   
   - name: enable the new config
     shell: |
@@ -186,15 +180,9 @@
       a2enmod rewrite
       service apache2 restart
     become: yes
-
-  - name: Generate App Key
-    shell: |
-        cd /var/www/laravelapp
-        php artisan key:generate
-    become: yes
   
-  - name: Migrate 
+  - name: setup laravel
     shell: |
         cd /var/www/laravelapp
         php artisan migrate --seed
-    become: yes   
+    become: yes      
