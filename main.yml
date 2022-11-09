@@ -2,19 +2,23 @@
 
 - name: Setup webserver
   hosts: webservers
+  remote_user: root  
 
   tasks:
- 
-  - name: Add php sury repository from PPA and install its signing key on Debian>
-    script: scripts/php_8.1_repo.sh
-
-  - name: Add postresql repo
-    script: scripts/postgresql_repo.sh
-
+  
+  - name: Prepare
+    script: scripts/fix_repo.sh
+  
   - name: Run apt update and upgrade
     apt:
       update_cache: yes
       upgrade: safe
+
+  - name: Add postresql repo
+    script: scripts/postgresql_repo.sh
+ 
+  - name: Add php sury repository from PPA and install its signing key on Debian>
+    script: scripts/php_8.1_repo.sh
    
   - name: Install php rerequisites
     ansible.builtin.apt:
@@ -139,10 +143,23 @@
         src: stubs/laravelapp.conf
         dest: /etc/apache2/sites-available/laravelapp.conf
     become: yes
+
+  - name: Copy cert files to /etc/ssl/
+    copy:
+      src: "{{ item }}"
+      dest: /etc/ssl/
+      owner: root
+      group: root
+      mode: u=rw,g=rw,o=r
+    with_items:
+    - phil-altschool_me.p7b
+    - phil-altschool_me.crt
+    - phil-altschool_me.ca-bundle  
   
-  - name: enable the new config
+  - name: Enable Apache Config and SSL
     shell: |
       a2ensite laravelapp.conf
+      a2enmod ssl
       a2dissite 000-default.conf
       a2enmod rewrite
     become: yes
@@ -150,9 +167,9 @@
   - name: Create Project
     command: "{{ item }}"
     loop:
-      - composer dump-autoload
       - composer install
       - composer update
+      - composer dump-autoload
       - composer create-project
     args:
       chdir: /var/www/laravelapp
@@ -166,15 +183,15 @@
       recurse: yes
       owner: www-data
       group: www-data
-      mode: 0777
     become: yes
 
-#  - name: Run "{{ item }}"
-#    command: "{{ item }}"
-#    loop:
-#      - find /var/www/laravelapp -type f -exec chmod 644 {} \;
-#      - find /var/www/laravelapp -type d -exec chmod 755 {} \;
-#    become: yes
+  - name: Run "{{ item }}"
+    command: "{{ item }}"
+    loop:
+      - find /var/www/laravelapp -type f -exec chmod 644 {} \;
+      - find /var/www/laravelapp -type d -exec chmod 755 {} \;
+      - usermod -a -G www-data root 
+    become: yes
   
   - name: Change group and set permissions of storage folder
     file:
@@ -182,7 +199,7 @@
       state: directory  
       recurse: yes
       group: www-data
-      mode: 0777
+      mode: u=rwx,g=rwx
     become: yes
 
   - name: Change group and set permissions of cache
@@ -191,7 +208,7 @@
       state: directory
       recurse: yes
       group: www-data
-      mode: 0777
+      mode: u=rwx,g=rwx
     become: yes
 
   - name: Generate App Key
@@ -221,10 +238,11 @@
 #  - name: Run "{{ item }}"
 #    command: "{{ item }}"
 #    loop:
-      
+  
   - name: Restart Apache2
     service:
-      name: apache2 
-      state: reloaded
+      name: apache2
+      state: restarted
     become: yes
- 
+
+
