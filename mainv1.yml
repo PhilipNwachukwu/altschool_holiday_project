@@ -24,7 +24,6 @@
       - software-properties-common
       - lsb-release
       - gnupg2
-      - gnupg
       - curl
  
   - name: Install php8.1
@@ -36,7 +35,7 @@
     - php8.1
   
   - name: Install Apache2
-    become: yes
+    become: true
     apt:
       name: apache2
       state: latest
@@ -65,10 +64,6 @@
       - php8.1-pgsql
       - php8.1-fpm
       - libapache2-mod-php8.1
-      - libapache2-mod-php 
-      - libonig5
-      - php 
-      - php8.1-mbstring
       - git
       - zip
       - unzip
@@ -79,15 +74,25 @@
     ansible.builtin.apt:
       name: ufw  
  
-  - name: Allow SSH
+  - name: Allow SSH,
     ufw:
       rule: allow
       name: OpenSSH
 
-  - name: Apache Full
+  - name: Apache,
     ufw:
       rule: allow
-      name: WWW Full
+      port:  "80"
+  
+  - name: Apache Secure,
+    ufw:
+      rule: allow
+      port:  "443"
+
+  - name: Open DBport,
+    ufw:
+      rule: allow
+      port:  "5432"
   
   - name: UFW Enable,
     ufw:
@@ -118,26 +123,38 @@
   - name: Template a web.php to /routes/web.php
     command: echo mytemplates/web.php > /var/www/laravelapp/routes/web.php
 
-  - name: copy .env.example
-    copy:
-        src: mytemplates/.env.example
-        dest: /var/www/laravelapp/.env.example
+  - name: Download and installs all libs and dependencies
+    composer:
+      command: update
+      working_dir: /var/www/laravelapp
+    environment:
+      COMPOSER_ALLOW_SUPERUSER: "1"  
   
-  - name: copy .env.example to .env
+  - name: copy .env
     copy:
-        src: /var/www/laravelapp/.env.example
+        src: mytemplates/.env
         dest: /var/www/laravelapp/.env
-        remote_src: true
- 
+        owner: www-data
+        group: www-data
+        mode: '775'
+    become: yes   
+
   - name: copy .htaccess
     copy:
         src: stubs/.htaccess
         dest: /var/www/laravelapp/.htaccess
+        owner: www-data
+        group: www-data
+        mode: '775'
+    become: yes
 
   - name: copy apache config
     copy:
         src: stubs/laravelapp.conf
         dest: /etc/apache2/sites-available/laravelapp.conf
+        owner: www-data
+        group: www-data
+        mode: '775'
     become: yes
   
   - name: enable the new config
@@ -147,84 +164,60 @@
       a2enmod rewrite
     become: yes
 
-  - name: Create Project
-    command: "{{ item }}"
-    loop:
-      - composer dump-autoload
-      - composer install
-      - composer update
-      - composer create-project
-    args:
-      chdir: /var/www/laravelapp
-    environment:
-      COMPOSER_ALLOW_SUPERUSER: "1"
-    become: yes
- 
-  - name: Change ownership and set permissions of laravel folder
-    file:
-      path: /var/www/laravelapp
-      recurse: yes
-      owner: www-data
-      group: www-data
-      mode: 0777
-    become: yes
-
-#  - name: Run "{{ item }}"
-#    command: "{{ item }}"
-#    loop:
-#      - find /var/www/laravelapp -type f -exec chmod 644 {} \;
-#      - find /var/www/laravelapp -type d -exec chmod 755 {} \;
-#    become: yes
-  
-  - name: Change group and set permissions of storage folder
-    file:
-      path: /var/www/laravelapp/storage
-      state: directory  
-      recurse: yes
-      group: www-data
-      mode: 0777
-    become: yes
-
-  - name: Change group and set permissions of cache
-    file:
-      path: /var/www/laravelapp/bootstrap/cache
-      state: directory
-      recurse: yes
-      group: www-data
-      mode: 0777
-    become: yes
-
   - name: Generate App Key
     shell: |
         cd /var/www/laravelapp
         php artisan key:generate
     become: yes
   
-  - name: Clear cache
-    shell: |
-      cd /var/www/laravelapp
-      php artisan cache:clear
-    become: yes
-
   - name: Set artisan config
     shell: |
         cd /var/www/laravelapp
         php artisan config:cache
     become: yes
 
-  - name: Migrate 
-    shell: |
-        cd /var/www/laravelapp
-        php artisan migrate:fresh
-    become: yes  
+#  - name: Migrate 
+#    shell: |
+#        cd /var/www/laravelapp
+#        php artisan migrate --seed
+#    become: yes   
+   
+  - name: Change ownership and set permissions of laravel folder
+    file:
+      path: /var/www/laravelapp/
+      recurse: yes
+      owner: www-data
+      group: www-data
+      mode: '775'
+    become: yes
+
+  - name: Change group and set permissions of storage folder
+    file:
+      path: /var/www/laravelapp/storage/
+      recurse: yes
+      group: www-data
+      mode: u=rwx,g=rwx,o=rwx
+    become: yes
+
+  - name: Change group and set permissions of cache
+    file:
+      path: /var/www/laravelapp/bootstrap/cache/
+      recurse: yes
+      group: www-data
+      mode: u=rwx,g=rwx,o=rx
+    become: yes
   
-#  - name: Run "{{ item }}"
-#    command: "{{ item }}"
-#    loop:
-      
+  - name: Change group and set permissions for laravel.logs
+    file:
+      path: /var/www/laravelapp/storage/logs/laravel.log
+      group: www-data
+      state: file
+      mode: u=rwx,g=rwx,o=w
+    become: yes  
+ 
   - name: Restart Apache2
     service:
       name: apache2 
-      state: reloaded
+      state: restarted
     become: yes
  
