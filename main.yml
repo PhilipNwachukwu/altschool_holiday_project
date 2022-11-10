@@ -1,8 +1,11 @@
 ---
-
 - name: Setup webserver
   hosts: webservers
   remote_user: root  
+
+  certbot_generate_certificates: true
+  certbot_register_email: your@email.com
+  certbot_certificate_domains: "{{ domains }}"
 
   tasks:
   
@@ -30,24 +33,24 @@
       - gnupg2
       - gnupg
       - curl
- 
-  - name: Install php8.1
-    apt:
-      name: php8.1
-      state: latest
-      update_cache: yes
-    tags:
-    - php8.1
-  
+
   - name: Install Apache2
     become: yes
     apt:
       name: apache2
       state: latest
       update_cache: yes
-  
+
   - name: Install PostgreSQL DB Server
     script: scripts/postgresql.sh
+
+  - name: Install php8.1
+    apt:
+      name: php8.1
+      state: latest
+      update_cache: yes
+    tags:
+    - php8.1 
 
   - name: Install a list of packages
     ansible.builtin.apt:
@@ -72,12 +75,31 @@
       - libapache2-mod-php 
       - libonig5
       - php 
+      - php8.1-bcmath
+      - php8.1-tokenizer
       - php8.1-mbstring
       - git
       - zip
       - unzip
       state: latest
       update_cache: yes
+
+  - name: Replace php.ini
+    copy:
+        src: stubs/php.ini
+        dest: /etc/php/8.1/apache2/php.ini
+
+  - name: Enable PHP FPM
+    shell: |
+      a2enmod proxy_fcgi setenvif
+      a2enconf php8.1-fpm
+    become: yes
+
+  - name: Restart Apache2
+    service:
+      name: apache2
+      state: restarted
+    become: yes
  
   - name: Install UFW
     ansible.builtin.apt:
@@ -110,6 +132,25 @@
       path: /usr/local/bin/composer
       mode: a+x
 
+   - name: Configure Apache
+    copy:
+        src: stubs/laravelapp.conf
+        dest: /etc/apache2/sites-available/laravelapp.conf
+    become: yes
+
+  - name: Enable Apache Config and SSL
+    shell: |
+      a2dissite 000-default.conf
+      a2densite laravelapp.conf
+      a2enmod rewrite
+    become: yes
+
+  - name: Restart Apache2
+    service:
+      name: apache2
+      state: restarted
+    become: yes
+
   - name: Clone laravel codebase
     git:
       repo: https://github.com/f1amy/laravel-realworld-example-app.git
@@ -118,9 +159,14 @@
     failed_when:
     - repo_clone.failed
     - not 'Local modifications exist in repository' in repo_clone.msg
-  
-  - name: Template a web.php to /routes/web.php
-    command: echo mytemplates/web.php > /var/www/laravelapp/routes/web.php
+
+  - name: Download and installs all libs and dependencies in composer.lock
+    composer:
+    command: install
+    working_dir: /var/www/laravelapp
+    environment:
+      COMPOSER_ALLOW_SUPERUSER: "1"
+    become: yes
 
   - name: copy .env.example
     copy:
@@ -132,90 +178,68 @@
         src: /var/www/laravelapp/.env.example
         dest: /var/www/laravelapp/.env
         remote_src: true
+
+  - name: Template a web.php to /routes/web.php
+    command: echo mytemplates/web.php > /var/www/laravelapp/routes/web.php
+
+  _ name: Add Servername 127.0.0.1 to apache2.conf
+    command: echo "Servername 127.0.0.1" >> /etc/apache2/apache2.conf
+
+  # - name: copy .htaccess
+  #   copy:
+  #       src: stubs/.htaccess
+  #       dest: /var/www/laravelapp/.htaccess
+
+  # - name: Your SSL file to path
+  #   copy: 
+  #     src: "{{ item.src }}" 
+  #     dest: "{{ item.dest }}"
+  #     owner: root
+  #     group: root
+  #     mode: u=rw,g=rw,o=r
+  #   with_items:
+  #   - { src: 'ssl_cert/phil-altschool_me.p7b', dest: '/etc/ssl/private/phil-altschool_me.p7b' }
+  #   - { src: 'ssl_cert/phil-altschool_me.crt', dest: '/etc/ssl/certs/phil-altschool_me.crt' }
+  #   - { src: 'ssl_cert/phil-altschool_me.ca-bundle', dest: '/etc/ssl/certs/phil-altschool_me.ca-bundle' }  
+  #   become: yes  
+
+  # - name: Create Project
+  #   command: "{{ item }}"
+  #   loop:
+  #     - composer install
+  #     - composer update
+  #     - composer dump-autoload
+  #     - composer create-project
+  #   args:
+  #     chdir: /var/www/laravelapp
+  #   environment:
+  #     COMPOSER_ALLOW_SUPERUSER: "1"
+  #   become: yes
  
-  - name: copy .htaccess
-    copy:
-        src: stubs/.htaccess
-        dest: /var/www/laravelapp/.htaccess
-  
-  - name: copy default-ssl.conf to default-ssl.conf.bak
-    copy:
-        src: /etc/apache2/sites-available/default-ssl.conf
-        dest: /etc/apache2/sites-available/default-ssl.conf.bak
-        remote_src: true
-  
-  - name: copy laravelapp-ssl.conf to server
-    copy:
-        src: stubs/laravelapp-ssl.conf
-        dest: /etc/apache2/sites-available/laravelapp-ssl.conf
-
-  - name: copy laravel.conf
-    copy:
-        src: stubs/laravelapp.conf
-        dest: /etc/apache2/sites-available/laravelapp.conf
-    become: yes
-
-  - name: Your SSL file to path
-    copy: 
-      src: "{{ item.src }}" 
-      dest: "{{ item.dest }}"
-      owner: root
-      group: root
-      mode: u=rw,g=rw,o=r
-    with_items:
-    - { src: 'ssl_cert/phil-altschool_me.p7b', dest: '/etc/ssl/private/phil-altschool_me.p7b' }
-    - { src: 'ssl_cert/phil-altschool_me.crt', dest: '/etc/ssl/certs/phil-altschool_me.crt' }
-    - { src: 'ssl_cert/phil-altschool_me.ca-bundle', dest: '/etc/ssl/certs/phil-altschool_me.ca-bundle' }  
-    become: yes  
-
-  - name: Enable Apache Config and SSL
-    shell: |
-      a2dissite 000-default.conf
-      a2disite default-ssl.conf
-      a2dissite laravelapp.conf
-      a2enmod ssl
-      a2 enmod headers
-      a2ensite laravelapp-ssl.conf
-      a2disconf ssl-params.conf
-      a2enmod rewrite
-    become: yes
-
-  - name: Create Project
-    command: "{{ item }}"
-    loop:
-      - composer install
-      - composer update
-      - composer dump-autoload
-      - composer create-project
-    args:
-      chdir: /var/www/laravelapp
-    environment:
-      COMPOSER_ALLOW_SUPERUSER: "1"
-    become: yes
- 
-  - name: Change ownership and set permissions of laravel folder
+  - name: Change ownership and set permissions of laravelapp folder
     file:
       path: /var/www/laravelapp
       recurse: yes
-      owner: www-data
+      state: directory
+      user: root
       group: www-data
+      mode: 0775
     become: yes
 
-  - name: Run "{{ item }}"
-    command: "{{ item }}"
-    loop:
-      - find /var/www/laravelapp -type f -exec chmod 644 {} \;
-      - find /var/www/laravelapp -type d -exec chmod 755 {} \;
-      - usermod -a -G www-data root 
-    become: yes
+  # - name: Run "{{ item }}"
+  #   command: "{{ item }}"
+  #   loop:
+  #     - find /var/www/laravelapp -type f -exec chmod 644 {} \;
+  #     - find /var/www/laravelapp -type d -exec chmod 755 {} \;
+  #     - usermod -a -G www-data root 
+  #   become: yes
   
   - name: Change group and set permissions of storage folder
     file:
       path: /var/www/laravelapp/storage
       state: directory  
       recurse: yes
-      group: www-data
-      mode: u=rwx,g=rwx
+      mode: 0775
     become: yes
 
   - name: Change group and set permissions of cache
@@ -223,20 +247,13 @@
       path: /var/www/laravelapp/bootstrap/cache
       state: directory
       recurse: yes
-      group: www-data
-      mode: u=rwx,g=rwx
+      mode: 0775
     become: yes
 
   - name: Generate App Key
     shell: |
         cd /var/www/laravelapp
         php artisan key:generate
-    become: yes
-  
-  - name: Clear cache
-    shell: |
-      cd /var/www/laravelapp
-      php artisan cache:clear
     become: yes
 
   - name: Set artisan config
@@ -248,7 +265,7 @@
   - name: Migrate 
     shell: |
         cd /var/www/laravelapp
-        php artisan migrate:fresh
+        php artisan migrate
     become: yes  
   
 #  - name: Run "{{ item }}"
@@ -260,5 +277,17 @@
       name: apache2
       state: restarted
     become: yes
+
+  - name: Install certbot
+    become: yes
+    apt:
+      name: python3-certbot-apache
+      state: latest
+      update_cache: yes
+
+  
+
+  
+      
 
 

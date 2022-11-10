@@ -1,0 +1,16 @@
+---
+- name: Install certbot with the apache plugin
+  yum: name=* state=latest
+
+- name: Install yum-utils (RHEL)
+  package: name={{item}} state=latest
+  with_items:
+    - yum-utils
+
+- name: Enable EPEL Optional Channel
+  command: yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
+
+- name: Install certbot-apache (RHEL)
+  package: name={{item}} state=latest
+  with_items:
+    - certbot-apache

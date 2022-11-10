@@ -16,7 +16,7 @@ wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-
 
 sudo apt-get update
 
-sudo apt-get -y install postgresql
+sudo apt-get -y install postgresql-15
 
 #sudo curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg >/dev/null
 
