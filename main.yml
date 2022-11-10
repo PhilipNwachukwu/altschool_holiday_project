@@ -98,7 +98,7 @@
     become: yes
  
   - name: Install UFW
-    ansible.builtin.apt:
+    apt:
       name: ufw  
  
   - name: Allow SSH
@@ -137,7 +137,7 @@
   - name: Enable Apache Config
     shell: |
       a2dissite 000-default.conf
-      a2densite laravelapp.conf
+      a2ensite laravelapp.conf
       a2enmod rewrite
     become: yes
 
@@ -180,37 +180,6 @@
 
   - name: Add Servername 127.0.0.1 to apache2.conf
     command: echo "Servername 127.0.0.1" >> /etc/apache2/apache2.conf
-
-  # - name: copy .htaccess
-  #   copy:
-  #       src: stubs/.htaccess
-  #       dest: /var/www/laravelapp/.htaccess
-
-  # - name: Your SSL file to path
-  #   copy: 
-  #     src: "{{ item.src }}" 
-  #     dest: "{{ item.dest }}"
-  #     owner: root
-  #     group: root
-  #     mode: u=rw,g=rw,o=r
-  #   with_items:
-  #   - { src: 'ssl_cert/phil-altschool_me.p7b', dest: '/etc/ssl/private/phil-altschool_me.p7b' }
-  #   - { src: 'ssl_cert/phil-altschool_me.crt', dest: '/etc/ssl/certs/phil-altschool_me.crt' }
-  #   - { src: 'ssl_cert/phil-altschool_me.ca-bundle', dest: '/etc/ssl/certs/phil-altschool_me.ca-bundle' }  
-  #   become: yes  
-
-  # - name: Create Project
-  #   command: "{{ item }}"
-  #   loop:
-  #     - composer install
-  #     - composer update
-  #     - composer dump-autoload
-  #     - composer create-project
-  #   args:
-  #     chdir: /var/www/laravelapp
-  #   environment:
-  #     COMPOSER_ALLOW_SUPERUSER: "1"
-  #   become: yes
  
   - name: Change ownership and set permissions of laravelapp folder
     file:
@@ -221,14 +190,6 @@
       group: www-data
       mode: 0775
     become: yes
-
-  # - name: Run "{{ item }}"
-  #   command: "{{ item }}"
-  #   loop:
-  #     - find /var/www/laravelapp -type f -exec chmod 644 {} \;
-  #     - find /var/www/laravelapp -type d -exec chmod 755 {} \;
-  #     - usermod -a -G www-data root 
-  #   become: yes
   
   - name: Change group and set permissions of storage folder
     file:
@@ -264,22 +225,11 @@
         php artisan migrate
     become: yes  
   
-#  - name: Run "{{ item }}"
-#    command: "{{ item }}"
-#    loop:
-  
   - name: Restart Apache2
     service:
       name: apache2
       state: restarted
     become: yes
-
-  - name: Install certbot
-    become: yes
-    apt:
-      name: python3-certbot-apache
-      state: latest
-      update_cache: yes
 
   
 

@@ -18,7 +18,6 @@ galaxy_info:
         - xenial
     - name: Debian
       versions:
-        - wheezy
-        - jessie
+        - bullseye
   galaxy_tags:
     - system
