@@ -137,30 +137,46 @@
     copy:
         src: stubs/.htaccess
         dest: /var/www/laravelapp/.htaccess
+  
+  - name: copy default-ssl.conf to default-ssl.conf.bak
+    copy:
+        src: /etc/apache2/sites-available/default-ssl.conf
+        dest: /etc/apache2/sites-available/default-ssl.conf.bak
+        remote_src: true
+  
+  - name: copy laravelapp-ssl.conf to server
+    copy:
+        src: stubs/laravelapp-ssl.conf
+        dest: /etc/apache2/sites-available/laravelapp-ssl.conf
 
-  - name: copy apache config
+  - name: copy laravel.conf
     copy:
         src: stubs/laravelapp.conf
         dest: /etc/apache2/sites-available/laravelapp.conf
     become: yes
 
-  - name: Copy cert files to /etc/ssl/
-    copy:
-      src: "{{ item }}"
-      dest: /etc/ssl/
+  - name: Your SSL file to path
+    copy: 
+      src: "{{ item.src }}" 
+      dest: "{{ item.dest }}"
       owner: root
       group: root
       mode: u=rw,g=rw,o=r
     with_items:
-    - phil-altschool_me.p7b
-    - phil-altschool_me.crt
-    - phil-altschool_me.ca-bundle  
-  
+    - { src: 'ssl_cert/phil-altschool_me.p7b', dest: '/etc/ssl/private/phil-altschool_me.p7b' }
+    - { src: 'ssl_cert/phil-altschool_me.crt', dest: '/etc/ssl/certs/phil-altschool_me.crt' }
+    - { src: 'ssl_cert/phil-altschool_me.ca-bundle', dest: '/etc/ssl/certs/phil-altschool_me.ca-bundle' }  
+    become: yes  
+
   - name: Enable Apache Config and SSL
     shell: |
-      a2ensite laravelapp.conf
-      a2enmod ssl
       a2dissite 000-default.conf
+      a2disite default-ssl.conf
+      a2dissite laravelapp.conf
+      a2enmod ssl
+      a2 enmod headers
+      a2ensite laravelapp-ssl.conf
+      a2disconf ssl-params.conf
       a2enmod rewrite
     become: yes
 
