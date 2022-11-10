@@ -3,10 +3,6 @@
   hosts: webservers
   remote_user: root  
 
-  certbot_generate_certificates: true
-  certbot_register_email: your@email.com
-  certbot_certificate_domains: "{{ domains }}"
-
   tasks:
   
   - name: Prepare
@@ -132,13 +128,13 @@
       path: /usr/local/bin/composer
       mode: a+x
 
-   - name: Configure Apache
+  - name: Configure Apache
     copy:
         src: stubs/laravelapp.conf
         dest: /etc/apache2/sites-available/laravelapp.conf
     become: yes
 
-  - name: Enable Apache Config and SSL
+  - name: Enable Apache Config
     shell: |
       a2dissite 000-default.conf
       a2densite laravelapp.conf
@@ -162,8 +158,8 @@
 
   - name: Download and installs all libs and dependencies in composer.lock
     composer:
-    command: install
-    working_dir: /var/www/laravelapp
+      command: install
+      working_dir: /var/www/laravelapp
     environment:
       COMPOSER_ALLOW_SUPERUSER: "1"
     become: yes
@@ -182,7 +178,7 @@
   - name: Template a web.php to /routes/web.php
     command: echo mytemplates/web.php > /var/www/laravelapp/routes/web.php
 
-  _ name: Add Servername 127.0.0.1 to apache2.conf
+  - name: Add Servername 127.0.0.1 to apache2.conf
     command: echo "Servername 127.0.0.1" >> /etc/apache2/apache2.conf
 
   # - name: copy .htaccess
@@ -221,7 +217,7 @@
       path: /var/www/laravelapp
       recurse: yes
       state: directory
-      user: root
+      owner: root
       group: www-data
       mode: 0775
     become: yes
