@@ -2,6 +2,13 @@
 - name: Setup webserver
   hosts: webservers
   remote_user: root  
+  
+  vars:
+
+    certbot_generate_certificates: true
+    certbot_register_email: philip.i.nwachukwu@gmail.com
+    certbot_certificate_domains:
+        - phil-altschool.me
 
   tasks:
   
@@ -224,14 +231,16 @@
         cd /var/www/laravelapp
         php artisan migrate
     become: yes  
-  
+
+  - name: Include the example role
+    include_role:
+      name: certbot-apache
+
   - name: Restart Apache2
     service:
       name: apache2
       state: restarted
     become: yes
-
-  
 
   
       

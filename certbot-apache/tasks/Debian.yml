@@ -1,7 +1,7 @@
 ---
 - name: Install certbot with the apache plugin
   apt: 
-    upgrade: yes
+    upgrade: safe
     update_cache: yes
     cache_valid_time: 3600  
 
@@ -23,7 +23,7 @@
     state: latest
 
 - name: Restart Apache2
-    service:
-      name: apache2
-      state: restarted
-    become: yes
+  service:
+    name: apache2
+    state: restarted
+  become: yes
