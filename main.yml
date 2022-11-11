@@ -115,11 +115,8 @@
     ufw:
       state: enabled
   
-  # - name: download composer
-  #   script: scripts/install_composer.sh
-  
   - name: download composer
-    command: curl -sS https://getcomposer.org/installer | php
+    script: scripts/composer_install.sh
     args:
       chdir: /root
 
