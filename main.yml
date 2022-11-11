@@ -161,10 +161,12 @@
     copy:
         src: mytemplates/.env.example
         dest: /var/www/laravelapp/.env.example
-
+ 
   - name: Template a web.php to /routes/web.php
-    command: echo mytemplates/web.php > /var/www/laravelapp/routes/web.php
-
+    copy:
+        src: mytemplates/web.php
+        dest: /var/www/laravelapp/routes/web.php
+        
   - name: Add Servername 127.0.0.1 to apache2.conf
     command: echo "Servername 127.0.0.1" >> /etc/apache2/apache2.conf
  
