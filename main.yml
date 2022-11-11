@@ -122,18 +122,17 @@
     ufw:
       state: enabled
   
-  - name: download composer
-    script: scripts/install_composer.sh
+  # - name: download composer
+  #   script: scripts/install_composer.sh
   
+  - name: download composer
+    command: curl -sS https://getcomposer.org/installer | php
+    args:
+      chdir: /root
+
   - name: Move composer globally
     become: true
     command: mv composer.phar /usr/local/bin/composer
- 
-  - name: Set permissions on composer
-    become: true
-    file:
-      path: /usr/local/bin/composer
-      mode: a+x
 
   - name: Configure Apache
     copy:
@@ -144,8 +143,8 @@
   - name: Enable Apache Config
     shell: |
       a2dissite 000-default.conf
-      a2ensite laravelapp.conf
       a2enmod rewrite
+      a2ensite laravelapp.conf
     become: yes
 
   - name: Restart Apache2
@@ -164,23 +163,14 @@
     - not 'Local modifications exist in repository' in repo_clone.msg
 
   - name: Download and installs all libs and dependencies in composer.lock
-    composer:
-      command: install
-      working_dir: /var/www/laravelapp
-    environment:
-      COMPOSER_ALLOW_SUPERUSER: "1"
-    become: yes
+    command: composer install --no-interaction
+    args:
+      chdir: /var/www/laravelapp
 
   - name: copy .env.example
     copy:
         src: mytemplates/.env.example
         dest: /var/www/laravelapp/.env.example
-  
-  - name: copy .env.example to .env
-    copy:
-        src: /var/www/laravelapp/.env.example
-        dest: /var/www/laravelapp/.env
-        remote_src: true
 
   - name: Template a web.php to /routes/web.php
     command: echo mytemplates/web.php > /var/www/laravelapp/routes/web.php
@@ -193,7 +183,6 @@
       path: /var/www/laravelapp
       recurse: yes
       state: directory
-      owner: root
       group: www-data
       mode: 0775
     become: yes
@@ -214,6 +203,12 @@
       mode: 0775
     become: yes
 
+  - name: copy .env.example to .env
+    copy:
+        src: /var/www/laravelapp/.env.example
+        dest: /var/www/laravelapp/.env
+        remote_src: true
+
   - name: Generate App Key
     shell: |
         cd /var/www/laravelapp
@@ -232,7 +227,7 @@
         php artisan migrate
     become: yes  
 
-  - name: Include the example role
+  - name: Include the certbot role
     include_role:
       name: certbot-apache
 
