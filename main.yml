@@ -2,13 +2,6 @@
 - name: Setup webserver
   hosts: webservers
   remote_user: root  
-  
-  vars:
-
-    certbot_generate_certificates: true
-    certbot_register_email: philip.i.nwachukwu@gmail.com
-    certbot_certificate_domains:
-        - phil-altschool.me
 
   tasks:
   
@@ -55,7 +48,7 @@
     tags:
     - php8.1 
 
-  - name: Install a list of packages
+  - name: Install php8.1 packages
     ansible.builtin.apt:
       pkg:
       - php8.1-opcache 
@@ -226,10 +219,6 @@
         cd /var/www/laravelapp
         php artisan migrate
     become: yes  
-
-  - name: Include the certbot role
-    include_role:
-      name: certbot-apache
 
   - name: Restart Apache2
     service:

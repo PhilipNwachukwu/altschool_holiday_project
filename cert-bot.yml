@@ -1,5 +1,5 @@
 ---
-- name: Setup webserver
+- name: Install SSL Certificate
   hosts: webservers
   remote_user: root  
 
