@@ -217,7 +217,13 @@
     shell: |
         cd /var/www/laravelapp
         php artisan migrate
-    become: yes  
+    become: yes 
+    
+  - name: Populate Database
+    shell: |
+        cd /var/www/laravelapp
+        php artisan db:seed
+    become: yes
 
   - name: Restart Apache2
     service:

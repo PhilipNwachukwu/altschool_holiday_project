@@ -10,9 +10,6 @@
     name: software-properties-common
     state: latest
 
-# - name: Enable Certbot Repository (DEB)
-#   command: add-apt-repository ppa:certbot/certbot
-
 - name: Update all packages to the latest version
   apt:
     upgrade: yes
@@ -21,6 +18,11 @@
   apt:
     name: python3-certbot-apache
     state: latest
+
+- name: Copy Laravelapp-le-ssl.conf
+  copy:
+    src: tasks/laravelapp-le-ssl.conf
+    dest: /etc/apache2/sites-enabled/laravelapp-le-ssl.conf
 
 - name: Restart Apache2
   service:
