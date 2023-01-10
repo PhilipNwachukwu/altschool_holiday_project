@@ -1,236 +1,31 @@
 ---
 - name: Setup webserver
-  hosts: webservers
-  remote_user: root  
+  hosts: webservers  
+  remote_user: admin
+
 
   tasks:
   
-  - name: Prepare
-    script: scripts/fix_repo.sh
-  
-  - name: Run apt update and upgrade
-    apt:
-      update_cache: yes
-      upgrade: safe
+  - name: Install nginx & php8.1
+    script: scripts/nginx.sh
 
-  - name: Add postresql repo
-    script: scripts/postgresql_repo.sh
- 
-  - name: Add php sury repository from PPA and install its signing key on Debian>
-    script: scripts/php_8.1_repo.sh
-   
-  - name: Install php rerequisites
-    ansible.builtin.apt:
-      pkg:
-      - ca-certificates
-      - apt-transport-https
-      - software-properties-common
-      - lsb-release
-      - gnupg2
-      - gnupg
-      - curl
-
-  - name: Install Apache2
-    become: yes
-    apt:
-      name: apache2
-      state: latest
-      update_cache: yes
-
-  - name: Install PostgreSQL DB Server
-    script: scripts/postgresql.sh
-
-  - name: Install php8.1
-    apt:
-      name: php8.1
-      state: latest
-      update_cache: yes
-    tags:
-    - php8.1 
-
-  - name: Install php8.1 packages
-    ansible.builtin.apt:
-      pkg:
-      - php8.1-opcache 
-      - php8.1-soap 
-      - php8.1-zip 
-      - php8.1-intl 
-      - php8.1-mysql 
-      - php8.1-common  
-      - php8.1-xmlrpc 
-      - php8.1-curl 
-      - php8.1-gd 
-      - php8.1-imagick 
-      - php8.1-dev 
-      - php8.1-imap 
-      - php8.1-cli
-      - php8.1-xml
-      - php8.1-pgsql
-      - php8.1-fpm
-      - libapache2-mod-php8.1
-      - libapache2-mod-php 
-      - libonig5
-      - php 
-      - php8.1-bcmath
-      - php8.1-tokenizer
-      - php8.1-mbstring
-      - git
-      - zip
-      - unzip
-      state: latest
-      update_cache: yes
-
-  - name: Replace php.ini
+  - name: Replace php default site file
     copy:
-        src: stubs/php.ini
-        dest: /etc/php/8.1/apache2/php.ini
-
-  - name: Enable PHP FPM
-    shell: |
-      a2enmod proxy_fcgi setenvif
-      a2enconf php8.1-fpm
+        src: mytemplates/default
+        dest: /etc/nginx/sites-available/default
+    become: yes
+  
+  - name: Copy index.php
+    copy:
+        src: mytemplates/index.php
+        dest: /var/www/html/index.php
     become: yes
 
-  - name: Restart Apache2
+  - name: Restart nginx
     service:
-      name: apache2
+      name: nginx
       state: restarted
     become: yes
- 
-  - name: Install UFW
-    apt:
-      name: ufw  
- 
-  - name: Allow SSH
-    ufw:
-      rule: allow
-      name: OpenSSH
-
-  - name: Apache Full
-    ufw:
-      rule: allow
-      name: WWW Full
-  
-  - name: UFW Enable,
-    ufw:
-      state: enabled
-  
-  - name: download composer
-    script: scripts/composer_install.sh
-    args:
-      chdir: /root
-
-  - name: Move composer globally
-    become: true
-    command: mv composer.phar /usr/local/bin/composer
-
-  - name: Configure Apache
-    copy:
-        src: stubs/laravelapp.conf
-        dest: /etc/apache2/sites-available/laravelapp.conf
-    become: yes
-
-  - name: Enable Apache Config
-    shell: |
-      a2dissite 000-default.conf
-      a2enmod rewrite
-      a2ensite laravelapp.conf
-    become: yes
-
-  - name: Restart Apache2
-    service:
-      name: apache2
-      state: restarted
-    become: yes
-
-  - name: Clone laravel codebase
-    git:
-      repo: https://github.com/f1amy/laravel-realworld-example-app.git
-      dest: /var/www/laravelapp
-    register: repo_clone
-    failed_when:
-    - repo_clone.failed
-    - not 'Local modifications exist in repository' in repo_clone.msg
-
-  - name: Download and installs all libs and dependencies in composer.lock
-    command: composer install --no-interaction
-    args:
-      chdir: /var/www/laravelapp
-
-  - name: copy .env.example
-    copy:
-        src: mytemplates/.env.example
-        dest: /var/www/laravelapp/.env.example
- 
-  - name: Template a web.php to /routes/web.php
-    copy:
-        src: mytemplates/web.php
-        dest: /var/www/laravelapp/routes/web.php
-        
-  - name: Add Servername 127.0.0.1 to apache2.conf
-    command: echo "Servername 127.0.0.1" >> /etc/apache2/apache2.conf
- 
-  - name: Change ownership and set permissions of laravelapp folder
-    file:
-      path: /var/www/laravelapp
-      recurse: yes
-      state: directory
-      group: www-data
-      mode: 0775
-    become: yes
-  
-  - name: Change group and set permissions of storage folder
-    file:
-      path: /var/www/laravelapp/storage
-      state: directory  
-      recurse: yes
-      mode: 0775
-    become: yes
-
-  - name: Change group and set permissions of cache
-    file:
-      path: /var/www/laravelapp/bootstrap/cache
-      state: directory
-      recurse: yes
-      mode: 0775
-    become: yes
-
-  - name: copy .env.example to .env
-    copy:
-        src: /var/www/laravelapp/.env.example
-        dest: /var/www/laravelapp/.env
-        remote_src: true
-
-  - name: Generate App Key
-    shell: |
-        cd /var/www/laravelapp
-        php artisan key:generate
-    become: yes
-
-  - name: Set artisan config
-    shell: |
-        cd /var/www/laravelapp
-        php artisan config:cache
-    become: yes
-
-  - name: Migrate 
-    shell: |
-        cd /var/www/laravelapp
-        php artisan migrate
-    become: yes 
-    
-  - name: Populate Database
-    shell: |
-        cd /var/www/laravelapp
-        php artisan db:seed
-    become: yes
-
-  - name: Restart Apache2
-    service:
-      name: apache2
-      state: restarted
-    become: yes
-
   
       
 
